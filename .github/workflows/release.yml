@@ -1,0 +1,27 @@
+name: Release
+on:
+    push:
+        branches: [main]
+env:
+    BUILD_DIR: ${{ github.workspace }}
+    XCODE_BUILD_PATH: DerivedData/Build/Products/Debug
+    APP_NAME: AltTab
+jobs:
+    build:
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v4
+            - run: sudo xcode-select -s /Applications/Xcode_26.0.1.app/Contents/Developer
+            - run: bash scripts/build_app.sh
+            - name: Zip app
+              run: cd "$XCODE_BUILD_PATH" && zip -r AltTab.zip AltTab.app
+            - name: Create release tag
+              id: tag
+              run: echo "tag=build-$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            - uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.tag.outputs.tag }}
+                  name: ${{ steps.tag.outputs.tag }}
+                  files: ${{ env.XCODE_BUILD_PATH }}/AltTab.zip
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
