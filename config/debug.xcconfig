@@ -2,6 +2,7 @@
 
 #include "base.xcconfig"
 
+CURRENT_PROJECT_VERSION = 11.1.0
 CODE_SIGN_IDENTITY = Local Self-Signed
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG // for macro `#if DEBUG`
 OTHER_SWIFT_FLAGS = -driver-time-compilation -Xfrontend -warn-long-function-bodies=250 -Xfrontend -warn-long-expression-type-checking=250 // find slow compilation areas

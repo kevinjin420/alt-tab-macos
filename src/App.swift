@@ -386,6 +386,7 @@ class App: AppCenterApplication {
     static func continueAppLaunchAfterPermissionsAreGranted() {
         Logger.info { "System permissions are granted; continuing launch" }
         BackgroundWork.start()
+        Windows.warmAerospaceCache()
         NSScreen.updatePreferred()
         Appearance.update()
         TilesPanel.updateMaxPossibleThumbnailSize()

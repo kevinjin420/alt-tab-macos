@@ -28,9 +28,27 @@ private func getAerospaceMapping() -> [UInt32: (UInt32, String)]? {
     return mapping
 }
 
+private func getFocusedAerospaceWorkspace() -> String? {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/aerospace")
+    process.arguments = ["list-workspaces", "--focused"]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    do {
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let s = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return s.isEmpty ? nil : s
+    } catch {
+        return nil
+    }
+}
+
 class Windows {
     static var list = [Window]()
     private(set) static var byWindowId = [CGWindowID: Window]()
+    fileprivate static var cachedAerospaceMapping = [UInt32: (UInt32, String)]()
+    fileprivate static var cachedFocusedAerospaceWorkspace: String? = nil
     // we use this to track if the focused window changed while alt-tab was open
     private static var lastFocusedWindowTarget: String?
     private static var lastWindowActivityType = WindowActivityType.none
@@ -174,6 +192,7 @@ class Windows {
                 !(!(f.showMinimizedWindows != .hide) && window.isMinimized) &&
                 !(f.spacesToShow == .visible && !Spaces.visibleSpaces.contains { visibleSpace in window.spaceIds.contains { $0 == visibleSpace } }) &&
                 !(f.spacesToShow == .nonVisible && Spaces.visibleSpaces.contains { visibleSpace in window.spaceIds.contains { $0 == visibleSpace } }) &&
+                !(f.spacesToShow == .currentAerospace && f.focusedAerospaceWorkspace != nil && window.aerospaceId != f.focusedAerospaceWorkspace) &&
                 !(f.screensToShow == .showingAltTab && !window.isOnScreen(NSScreen.preferred)) &&
                 (f.groupTabs == .separateWindows || !window.isTabbed))
     }
@@ -398,16 +417,35 @@ class Windows {
         }
     }
 
-    private static func flushAerospaceStats() {
-        if let aerospaceMapping = getAerospaceMapping() {
-            list.forEach { window in
-                if let cgWindowId = window.cgWindowId {
-                    if let result = aerospaceMapping[cgWindowId] {
-                        window.monitorId = result.0
-                        window.aerospaceId = result.1
-                    }
-                }
+    static func warmAerospaceCache() {
+        BackgroundWork.screenshotsQueue.addOperation {
+            let mapping = getAerospaceMapping() ?? [:]
+            let focused = getFocusedAerospaceWorkspace()
+            DispatchQueue.main.async {
+                cachedAerospaceMapping = mapping
+                cachedFocusedAerospaceWorkspace = focused
             }
+        }
+    }
+
+    private static func flushAerospaceStats() {
+        applyAerospaceMapping(cachedAerospaceMapping)
+        BackgroundWork.screenshotsQueue.addOperation {
+            let mapping = getAerospaceMapping() ?? [:]
+            let focused = getFocusedAerospaceWorkspace()
+            DispatchQueue.main.async {
+                cachedAerospaceMapping = mapping
+                cachedFocusedAerospaceWorkspace = focused
+                applyAerospaceMapping(mapping)
+            }
+        }
+    }
+
+    private static func applyAerospaceMapping(_ mapping: [UInt32: (UInt32, String)]) {
+        list.forEach { window in
+            guard let cgWindowId = window.cgWindowId, let result = mapping[cgWindowId] else { return }
+            window.monitorId = result.0
+            window.aerospaceId = result.1
         }
     }
 
@@ -606,6 +644,7 @@ struct WindowFilters {
     let spacesToShow: SpacesToShowPreference
     let screensToShow: ScreensToShowPreference
     let groupTabs: GroupTabsPreference
+    let focusedAerospaceWorkspace: String?
 
     static func snapshot() -> WindowFilters {
         let i = SwitcherSession.current?.shortcutIndex ?? 0
@@ -618,6 +657,7 @@ struct WindowFilters {
             showMinimizedWindows: Preferences.showMinimizedWindows[i],
             spacesToShow: Preferences.spacesToShow[i],
             screensToShow: Preferences.screensToShow[i],
-            groupTabs: Preferences.groupTabs(i))
+            groupTabs: Preferences.groupTabs(i),
+            focusedAerospaceWorkspace: Windows.cachedFocusedAerospaceWorkspace)
     }
 }
