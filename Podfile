@@ -34,7 +34,6 @@ post_install do |installer|
     target.build_configurations.each do |config|
       # disable code signing which is unnecessary for pods
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       # set deployment_target for all pods, to avoid libarclite compiler error
       config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = deployment_target
     end
