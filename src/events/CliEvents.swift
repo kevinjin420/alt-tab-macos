@@ -89,6 +89,15 @@ class CliServer {
             App.showUi(shortcutIndex)
             return noOutput
         }
+        if rawValue.hasPrefix("--aerospace-workspace-changed=") {
+            let workspace = String(rawValue.dropFirst("--aerospace-workspace-changed=".count))
+            if !workspace.isEmpty { Windows.notifyAerospaceWorkspaceChanged(workspace) }
+            return noOutput
+        }
+        if rawValue == "--aerospace-mapping-changed" {
+            Windows.refreshAerospaceMappingInBackground()
+            return noOutput
+        }
         return error
     }
 
@@ -128,7 +137,7 @@ class CliClient {
     static func detectCommand() -> String? {
         let args = CommandLine.arguments
         if args.count == 2 && !args[1].starts(with: "--logs=") {
-            if args[1] == "--list" || args[1] == "--detailed-list" || args[1].hasPrefix("--focus=") || args[1].hasPrefix("--focusUsingLastFocusOrder=") || args[1].hasPrefix("--show=") {
+            if args[1] == "--list" || args[1] == "--detailed-list" || args[1].hasPrefix("--focus=") || args[1].hasPrefix("--focusUsingLastFocusOrder=") || args[1].hasPrefix("--show=") || args[1].hasPrefix("--aerospace-workspace-changed=") || args[1] == "--aerospace-mapping-changed" {
                 return args[1]
             }
         }

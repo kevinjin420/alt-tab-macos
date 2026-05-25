@@ -417,6 +417,10 @@ class Windows {
         }
     }
 
+    static func notifyAerospaceWorkspaceChanged(_ workspace: String) {
+        cachedFocusedAerospaceWorkspace = workspace
+    }
+
     static func warmAerospaceCache() {
         BackgroundWork.screenshotsQueue.addOperation {
             let mapping = getAerospaceMapping() ?? [:]
@@ -424,21 +428,36 @@ class Windows {
             DispatchQueue.main.async {
                 cachedAerospaceMapping = mapping
                 cachedFocusedAerospaceWorkspace = focused
+                scheduleAerospaceMappingPoll()
+            }
+        }
+    }
+
+    static func refreshAerospaceMappingInBackground() {
+        BackgroundWork.screenshotsQueue.addOperation {
+            let mapping = getAerospaceMapping() ?? [:]
+            DispatchQueue.main.async {
+                cachedAerospaceMapping = mapping
+                applyAerospaceMapping(mapping)
+            }
+        }
+    }
+
+    private static func scheduleAerospaceMappingPoll() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            BackgroundWork.screenshotsQueue.addOperation {
+                let mapping = getAerospaceMapping() ?? [:]
+                DispatchQueue.main.async {
+                    cachedAerospaceMapping = mapping
+                    applyAerospaceMapping(mapping)
+                    scheduleAerospaceMappingPoll()
+                }
             }
         }
     }
 
     private static func flushAerospaceStats() {
         applyAerospaceMapping(cachedAerospaceMapping)
-        BackgroundWork.screenshotsQueue.addOperation {
-            let mapping = getAerospaceMapping() ?? [:]
-            let focused = getFocusedAerospaceWorkspace()
-            DispatchQueue.main.async {
-                cachedAerospaceMapping = mapping
-                cachedFocusedAerospaceWorkspace = focused
-                applyAerospaceMapping(mapping)
-            }
-        }
     }
 
     private static func applyAerospaceMapping(_ mapping: [UInt32: (UInt32, String)]) {
