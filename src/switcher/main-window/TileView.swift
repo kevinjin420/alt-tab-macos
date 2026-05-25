@@ -260,7 +260,7 @@ class TileView: FlippedView {
             isHidden: element.isHidden && !Preferences.hideStatusIcons,
             isFullscreen: element.isFullscreen && !Preferences.hideStatusIcons,
             isMinimized: element.isMinimized && !Preferences.hideStatusIcons,
-            showSpace: !(element.isWindowlessApp || Spaces.isSingleSpace() || Preferences.hideSpaceNumberLabels || {
+            showSpace: !(element.isWindowlessApp || Preferences.hideSpaceNumberLabels || {
                 let shortcutIndex = SwitcherSession.current?.shortcutIndex ?? 0
                 return Preferences.spacesToShow[shortcutIndex] == .visible && (
                     NSScreen.screens.count < 2 || Preferences.screensToShow[shortcutIndex] == .showingAltTab
@@ -287,11 +287,10 @@ class TileView: FlippedView {
         fullTitleWidth = label.cell!.cellSize.width
         label.updateTruncationModeIfNeeded()
         if statusIcons.spaceVisible {
-            let spaceIndex = element.spaceIndexes.first
-            if element.isOnAllSpaces || (spaceIndex != nil && spaceIndex! > 30) {
+            if element.isOnAllSpaces {
                 statusIcons.setSpaceStar()
-            } else if let spaceIndex {
-                statusIcons.setSpaceNumber(spaceIndex)
+            } else {
+                statusIcons.setSpaceText(element.aerospaceId ?? "N/A")
             }
         }
         updateAppIcon(element, title)

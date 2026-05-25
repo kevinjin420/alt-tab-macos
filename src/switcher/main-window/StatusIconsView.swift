@@ -1,4 +1,16 @@
 import Cocoa
+import CommonCrypto
+
+func aerospaceColorFrom(text: String) -> NSColor {
+    let data = Data(text.utf8)
+    var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+    _ = data.withUnsafeBytes { CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash) }
+    let hashInt = Int(hash.prefix(3).reduce(0) { $0 << 8 + Int($1) })
+    let hue = CGFloat(hashInt % 11) / 11 * 310
+    let saturation: CGFloat = (hue > 110.0 && hue < 170.0) ? 0.6 : 0.7
+    let brightness: CGFloat = (hue > 110.0 && hue < 170.0) ? 0.9 : 1.0
+    return NSColor(calibratedHue: hue / 360, saturation: saturation, brightness: brightness, alpha: 1.0)
+}
 
 class StatusIconsView: FlippedView {
     struct Icon {
@@ -22,6 +34,7 @@ class StatusIconsView: FlippedView {
     var icons: [Icon]
     private var visibleCount = 0
     private var tooltipsDirty = true
+    private var aerospaceText: String? = nil
     /// Single-character cell size, cached at init for the layout cache
     let iconCellSize: NSSize
 
@@ -68,13 +81,20 @@ class StatusIconsView: FlippedView {
     }
 
     func setSpaceStar() {
+        aerospaceText = nil
         icons[Self.spaceIdx].symbol = Symbols.circledStar.rawValue
         icons[Self.spaceIdx].tooltip = NSLocalizedString("Window is on every Space", comment: "")
     }
 
     func setSpaceNumber(_ number: Int) {
+        aerospaceText = nil
         icons[Self.spaceIdx].symbol = Self.symbolForSpace(number)
         icons[Self.spaceIdx].tooltip = String(format: NSLocalizedString("Window is on Space %d", comment: ""), number)
+    }
+
+    func setSpaceText(_ text: String) {
+        aerospaceText = text
+        icons[Self.spaceIdx].tooltip = text
     }
 
     static func symbolForSpace(_ number: Int) -> String {
@@ -123,11 +143,18 @@ class StatusIconsView: FlippedView {
         let isLTR = App.shared.userInterfaceLayoutDirection == .leftToRight
         let yOffset = ((frame.height - iconHeight) / 2).rounded()
         var offset = CGFloat(0)
-        for icon in icons {
+        for (idx, icon) in icons.enumerated() {
             guard icon.visible else { continue }
             offset += iconWidth
             let x = isLTR ? frame.width - offset : offset - iconWidth
-            Self.cachedAttrString(for: icon.symbol).draw(at: NSPoint(x: x, y: yOffset))
+            if idx == Self.spaceIdx, let aerospaceText {
+                let font = NSFont(name: "SF Pro Text", size: (Appearance.fontHeight * 0.85).rounded())!
+                let color = aerospaceColorFrom(text: aerospaceText)
+                let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color, .paragraphStyle: TileFontIconView.paragraphStyle]
+                NSAttributedString(string: aerospaceText, attributes: attrs).draw(at: NSPoint(x: x, y: yOffset))
+            } else {
+                Self.cachedAttrString(for: icon.symbol).draw(at: NSPoint(x: x, y: yOffset))
+            }
         }
     }
 }

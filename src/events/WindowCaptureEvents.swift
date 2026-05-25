@@ -129,10 +129,16 @@ class WindowCaptureScreenshotsPrivateApi {
             Applications.captureThrottler.throttleOrProceed(key: "capture-wid-\(wid)", queue: BackgroundWork.screenshotsQueue, priority: isPrioritized ? .high : .normal) { [weak window] in
                 guard source != .refreshOnlyThumbnailsAfterShowUi || SwitcherSession.isActive else { return }
                 guard let wid = window?.cgWindowId, let cgImage = oneTimeCapture(wid) else { return }
+                let imageToUse: CGImage
+                if cgImage.width < 10 || cgImage.height < 10, case .cgImage(let existing?) = window?.thumbnail {
+                    imageToUse = existing
+                } else {
+                    imageToUse = cgImage
+                }
                 guard source != .refreshOnlyThumbnailsAfterShowUi || SwitcherSession.isActive else { return }
                 DispatchQueue.main.async { [weak window] in
                     guard source != .refreshOnlyThumbnailsAfterShowUi || SwitcherSession.isActive else { return }
-                    window?.refreshThumbnail(.cgImage(cgImage))
+                    window?.refreshThumbnail(.cgImage(imageToUse))
                 }
             }
         }

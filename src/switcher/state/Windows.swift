@@ -1,5 +1,33 @@
 import Cocoa
 
+private func executeAerospaceSearch() -> [String]? {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/aerospace")
+    process.arguments = ["list-windows", "--all", "--format", "%{window-id},%{monitor-id},%{workspace}"]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    do {
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let outputString = String(data: data, encoding: .utf8) else { return nil }
+        return outputString.split(separator: "\n").map { String($0) }
+    } catch {
+        return nil
+    }
+}
+
+private func getAerospaceMapping() -> [UInt32: (UInt32, String)]? {
+    guard let lines = executeAerospaceSearch() else { return nil }
+    var mapping = [UInt32: (UInt32, String)]()
+    for line in lines {
+        let parts = line.split(separator: ",")
+        if parts.count == 3, let windowId = UInt32(parts[0]), let monitorId = UInt32(parts[1]) {
+            mapping[windowId] = (monitorId, String(parts[2]))
+        }
+    }
+    return mapping
+}
+
 class Windows {
     static var list = [Window]()
     private(set) static var byWindowId = [CGWindowID: Window]()
@@ -87,6 +115,7 @@ class Windows {
             refreshIfWindowShouldBeShownToTheUser(window, filters)
         }
         refreshWhichWindowsToShowTheUser()
+        flushAerospaceStats()
         sort()
         return true
     }
@@ -369,6 +398,19 @@ class Windows {
         }
     }
 
+    private static func flushAerospaceStats() {
+        if let aerospaceMapping = getAerospaceMapping() {
+            list.forEach { window in
+                if let cgWindowId = window.cgWindowId {
+                    if let result = aerospaceMapping[cgWindowId] {
+                        window.monitorId = result.0
+                        window.aerospaceId = result.1
+                    }
+                }
+            }
+        }
+    }
+
     /// reordered list based on preferences, keeping the original index
     private static func sort() {
         let trimmedQuery = Search.normalizedQuery((SwitcherSession.current?.searchQuery ?? ""))
@@ -409,15 +451,9 @@ class Windows {
                 order = compareByAppNameThenWindowTitle($0, $1)
             }
             if sortType == .space {
-                if $0.isOnAllSpaces && $1.isOnAllSpaces {
-                    order = .orderedSame
-                } else if $0.isOnAllSpaces {
-                    order = .orderedAscending
-                } else if $1.isOnAllSpaces {
-                    order = .orderedDescending
-                } else if let spaceIndex0 = $0.spaceIndexes.first, let spaceIndex1 = $1.spaceIndexes.first {
-                    order = spaceIndex0.compare(spaceIndex1)
-                }
+                order = $0.aerospaceId == nil ? .orderedDescending :
+                         $1.aerospaceId == nil ? .orderedAscending :
+                          $0.aerospaceId!.compare($1.aerospaceId!)
                 if order == .orderedSame {
                     order = compareByAppNameThenWindowTitle($0, $1)
                 }
