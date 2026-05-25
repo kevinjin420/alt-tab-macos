@@ -12,6 +12,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - run: sudo xcode-select -s /Applications/Xcode_26.0.1.app/Contents/Developer
+            - run: bash scripts/codesign/setup_ci_pr.sh
             - run: bash scripts/build_app.sh
             - name: Zip app
               run: cd "$XCODE_BUILD_PATH" && zip -r AltTab.zip AltTab.app
